@@ -10,6 +10,8 @@ addpath("D:\PhD\IM_DD_DSP\Data\DML-NRZ-50G\252mA")
 addpath("Fncs\")
 addpath("DSP\")
 addpath('Plot\')
+addpath('Phase_Sync\')
+addpath('Sync\')
 
 % 读取参考序列
 load ref32768 % can be replaced by prbs.m
@@ -79,7 +81,7 @@ for powID = 1:length(Vpp)
     ds.name=name;
     ds.data=ber;
     ds.saveToMat();
-    
+
     % 绘图准备
     BER(powID)=ber;
     V_PP(powID)=-Vpp(powID);
