@@ -1,5 +1,6 @@
 classdef DspSyncDecoding < handle
     % 设计一个 专门 为 DSP 流程中  同步，解码 的类
+    % 流程：接收信号 → 载波同步（频率补偿） → 符号同步（相位补偿） → 解调
     properties
         % 为了方便后续添加变量，采用结构体方式进行变量命名
         signalPHY; % 传入的信号参数
@@ -24,7 +25,7 @@ classdef DspSyncDecoding < handle
 
 
         function clk_output=ClockRecovery(obj,input_signal)
-            %数字时钟恢复
+            %数字时钟恢复（载波频率）
             f_up=obj.Nr.time_osr *obj.signalPHY.fb; % 时钟恢复所需要的采样率
             data_up = resample(input_signal,f_up,obj.signalPHY.fs);  %一般采用四倍上采样，满足后续时钟恢复频率
             % 使用时钟恢复函数
@@ -52,10 +53,21 @@ classdef DspSyncDecoding < handle
 
 
         function syncedSignal=Time_recovery(obj,input_signal)
-            % 对输入信号执行时间恢复 和 同步
+            % 对输入信号执行时间（频率）恢复 和 同步
             clk_output=obj.ClockRecovery(input_signal);
             [syncedSignal,~] = obj.Synchronization(clk_output);
         end
+
+
+        function   [DeWaveform,P,OptSampPhase,MaxCorrIndex]=time_phase_Recovery(obj,input_signal)
+           % 参考信号
+            label=obj.Implementation.ref;
+            %数字时钟恢复（载波频率）
+            fs_up=obj.Nr.time_osr *obj.signalPHY.fs; % 时钟恢复所需要的采样率
+ [DeWaveform,P,OptSampPhase,MaxCorrIndex] = Quick_Syn_Vec(input_signal,label,1/fs_up,1/obj.signalPHY.fb  );
+
+        end
+
 
         function [decodedData,ber] = NRZ_ExecuteDecoding(obj, eq_signal)
             % NRZ信号执行解码操作
