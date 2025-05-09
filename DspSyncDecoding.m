@@ -262,6 +262,14 @@ classdef DspSyncDecoding < handle
 
         end
 
+        % Match匹配滤波操作
+        function sigMatch=signalMatch(~,eq_signal,hsqrt)
+            eq_signal=eq_signal-mean(eq_signal);
+            % match
+            sigMatch=conv(eq_signal,hsqrt,'same');
+            % norm
+            sigMatch=pnorm(sigMatch);
+        end
 
         function [decodedData,ber] = NRZ_ExecuteDecoding(obj, eq_signal)
             % NRZ信号执行解码操作
