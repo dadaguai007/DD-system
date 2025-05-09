@@ -286,7 +286,9 @@ classdef DspSyncDecoding < handle
         function [decodedData,ber] = PAM_ExecuteDecoding(obj, eq_signal)
             % 针对 PAM4 解码，计算误码
             % 量化区间
-            A=[-2 0 2];
+            A1=[-2 0 2];
+            % 归一化
+            A=pnorm(A1);
             % 参考信号  重复 一定数量 ，满足解码 数量
             ref_seq=repmat(obj.Implementation.ref,1000,1);
             ref_seq=ref_seq(:);
