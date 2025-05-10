@@ -7,7 +7,7 @@ switch Eqmode
         sigRx_E = xn;
     case 1
         EQ=struct();
-        EQ.u=0.01;
+        EQ.u=0.01; %  0.0001
         EQ.k1=31;
         EQ.k2=15;
         EQ.ref=8;

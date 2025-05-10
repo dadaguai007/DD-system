@@ -28,3 +28,5 @@ y(1:tap_num) = input(1:tap_num); %假设滤波器前几个点为输入值
         e(i-tap_num) = dn(i) - y(i);
     end
 end
+
+% [y_ffe,e_ffe(i,:)] = adam(noisySig(2:end),txSig,t_fe);
