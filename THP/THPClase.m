@@ -1,4 +1,4 @@
-classdef THPClasee
+classdef THPClase
     % THP均衡器类
     properties
         channelLength   % 信道冲激响应长度（抽头数）
@@ -13,7 +13,7 @@ classdef THPClasee
         % H_inv_f(abs(H_f) < eps) = 0; % 避免除以零
         % X_pre_f = X_f .* H_inv_f; % 预均衡信号频域
 
-        function obj=THPClasee(channelLength, blockLength)
+        function obj=THPClase(channelLength, blockLength)
             % 初始化信道参数并生成状态矩阵
             obj.channelLength = channelLength;  % 信道记忆长度（如3抽头）
             obj.blockLength = blockLength;      % 传输块长度（如100比特）
@@ -28,11 +28,11 @@ classdef THPClasee
             end
         end
 
-        function output=zTrans(~,z_output,x)
+        function output=zTrans(obj,z_output,x)
             % 从z变换转换为时域信号
             % z_output为表达式，x为初始时域信号
             o = iztrans(z_output);      % 逆Z变换得到时域表达式
-            output = delta2sequence(o, length(x)); % 转换为离散序列
+            output = obj.delta2sequence(o, length(x)); % 转换为离散序列
         end
 
         function mod = modulo(~,sequence, N)
