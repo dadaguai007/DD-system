@@ -1,6 +1,5 @@
 clc;clear;close all;
-addpath('Fncs\');
-addpath('THP\');
+addpath('D:\BIT_PhD\DD-system\THP\Fncs\');
 % 系统参数设置
 N = 3;                    % 模运算的模数
 x = ones(8,1)*0.75;         % 生成8点原始信号序列，每个元素为0.75
@@ -20,7 +19,7 @@ Ta  = 1/Fs;
 
 %PAM
 M=4;
-data_2bit=randi([0,1],log2(M),800);
+data_2bit=randi([0,1],log2(M),80);
 % 相当于四个电平
 symbols = 2.^(0:log2(M)-1)*data_2bit;
 % Mapeia bits para pulsos
