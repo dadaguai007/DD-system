@@ -295,7 +295,7 @@ classdef DspSyncDecoding < handle
             % 量化区间
             A=[-2 0 2];
             % 参考信号  重复 一定数量 ，满足解码 数量
-            ref_seq=repmat(obj.Implementation.ref,1000,1);
+            ref_seq=repmat(obj.Implementation.ref,100,1);
             ref_seq=ref_seq(:);
             % 参考序列
             [~,label] = quantiz(ref_seq,A,[-3,-1,1,3]);

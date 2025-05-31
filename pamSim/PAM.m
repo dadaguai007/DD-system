@@ -20,7 +20,7 @@ Pi = 10^(Pi_dBm/10)*1e-3; %W
 % fiber
 param=struct();
 param.Ltotal = 40; %km
-param.Lspan =20;
+param.Lspan =10;
 param.hz= 0.1;
 param.alpha=0.2;
 param.D = 16;
@@ -54,7 +54,7 @@ label=symbTx;
 symbolsUp = upsample(symbTx, SpS);
 
 % Puls
-hsqrt = rcosdesign(0.01,256,SpS,'sqrt');
+hsqrt = rcosdesign(0.2,256,SpS,'sqrt');
 % pulse shaping
 sigTx=conv(symbolsUp,hsqrt,'same');
 
@@ -75,7 +75,7 @@ power=signalpower(sigTxo);
 fprintf(' after module signal power: %.2f dBm\n', 10 * log10(power / 1e-3));
 
 plot_spectrum(sigTxo,Fs);
-type='none';
+type='Tran';
 if strcmp(type,'Tran')
 % PAM_tran
 sigRxo=ssfm(sigTxo,param);
@@ -99,7 +99,7 @@ sigRx_E=pnorm(sigRx_E);
 % 同步
 % Label=repelem(label,SpS); % 别说，使用这样的方法进行同步，效果更为准确！！！
 % [sigRx_E,ref_sync,ff_ssfm] = sync(sigRx_E,Label);
-if 1
+if 0
 % 均衡
 PAM_Equ;
 else

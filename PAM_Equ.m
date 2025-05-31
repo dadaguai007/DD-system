@@ -11,7 +11,7 @@ EQ.delta=0.01;
 % FFE_RLS
 % [sigRx_E,en,w] = FFE_RLS(EQ, xn, label);
 % DFE_LMS
-[sigRx_E,en,w] = DFE_LMS(EQ, xn, label);
+% [sigRx_E,en,w] = DFE_LMS(EQ, xn, label);
 % DFE_RLS
 % [sigRx_E,en,w] = DFE_RLS(EQ, xn, label);
 % APA
@@ -24,7 +24,7 @@ taps_list_ABS = [31 0 0 15 5 3];
 step_len = 0.001;
 lamda=0.9999;
 % volterra_lms
-% [sigRx_E,en,w]=volterra_dfe_lms(xn,label,sps,ref,taps_list,step_len);
+[sigRx_E,en,w]=volterra_dfe_lms(xn,label,sps,ref,taps_list,step_len);
 % volterra_rls
 % [sigRx_E,en,w]=volterra_dfe_rls(xn,label,sps,ref,taps_list,lamda);
 % abf_rls

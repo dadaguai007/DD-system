@@ -8,6 +8,7 @@ classdef DDTx < handle
         TxPHY % 发射机参数
         Nr %无量纲参数
         Button % 开关讯号
+        Implementation
     end
 
     % 定义类的方法
@@ -30,10 +31,24 @@ classdef DDTx < handle
                 obj.Button.DataType                    = varargin{12};% 选择模式
                 obj.Button.shapingFilter               = varargin{13};% 成型滤波器的生成方式
             end
+            obj.Button.delaySignal = 'symbol';          % 采用采样点延迟
+        end
+
+
+
+        % 创建参考星座图
+        function [const,Ksym]=creatReferenceConstellation(obj)
+            % Constellation
+            z = (0:obj.TxPHY.M-1)';
+            % 星座图生成
+            const=pammod(z,obj.TxPHY.M);
+            Ex       = 1;          % 符号平均能量
+            Ksym = modnorm(const, 'avpow', Ex);   % 能量归一化因子
+            obj.Implementation.constellation  = Ksym * const; % 调整后的参考星座
         end
 
         % 输出信号
-        function [filteredSignal,pam_signal]=dataOutput(obj)
+        function [filteredSignal,pamSignalNorm]=dataOutput(obj)
             % 成型滤波器
             if strcmp(obj.Button.shapingFilter,'system')
                 pulse = obj.systemHsqrt();
@@ -54,14 +69,28 @@ classdef DDTx < handle
             pamSignalNorm = pnorm(pam_signal);
             % 脉冲成型 装载成型后的信号
             filteredSignal=obj.applyShapingFilter(pamSignalNorm,pulse);
+        end
 
+
+        % 延迟函数：
+        function outSignal=delaySignal(obj,input,delay)
+            switch lower(obj.Button.delaySignal)
+                case 'symbol'
+                    % 延迟样本数 整数 或者 小数 都能实现
+                    outSignal = delay_signal(input, delay);
+                case 'time'
+                    % 延迟时间数
+                    % delay = 50e-12;    % 50ps延迟
+                    outSignal = iqdelay(input, obj.TxPHY.fs, delay);
+                    outSignal=outSignal.';
+            end
         end
 
         % 线性部分响应编码
         function [filteredPRS,prs_sig,lcoeff]=prsSignal(obj,D,taps)
             % 生成脉冲成型信号
             [~,pam_signal]=obj.dataOutput();
-            % Linear encoding
+            % Linear encoding   1sps 选项
             lcoeff = prsFilter(D, taps-1, 1);
             % 归一化
             lcoeff = lcoeff / sum(lcoeff);
@@ -93,12 +122,22 @@ classdef DDTx < handle
             nlcoeff = nlcoeff / sum(nlcoeff);
             % 抽头参量
             w = [lcoeff, nlcoeff];
+            w=w.';
+            % 一阶
+            tapslen_1=taps1;
+            % 二阶
+            tapslen_2=taps2;
+            % 三阶
+            tapslen_3=taps3;
+            % 前馈抽头
+            x1=zeros(tapslen_1,1);
 
             prs_sig=zeros(length(pam_signal),1);
-            for i=1:length(pam_signal)+1-taps1
+            sps=1; % 1sps 处理
+            for i=1:length(pam_signal)
                 % 按照Volterra级数形式生成非线性信号
                 %一阶前馈输入
-                x1 = pam_signal(i:i+taps1);
+                x1 = cat(1,x1(sps+1:end),pam_signal(sps*i-sps+1:1:sps*i));
                 %二阶前馈输入 % 从x1中确定好抽头的数量
                 x2 = x1(round((tapslen_1-tapslen_2)/2)+1 : end - fix((tapslen_1-tapslen_2)/2));
                 % 二阶核
@@ -112,7 +151,7 @@ classdef DDTx < handle
                 % 结合
                 x_all = [x x2_vol x3_vol];
                 % Flitering
-                prs_sig(i+taps1-1) = w * x_all;
+                prs_sig(i) = x_all*w;
             end
             % 成型滤波器
             if strcmp(obj.Button.shapingFilter,'system')
@@ -138,8 +177,9 @@ classdef DDTx < handle
         function symbols_rand=rand_bits(obj)
             rng(obj.TxPHY.order);
             %参数：obj.prbsOrder，NSym，M
-            symbols_rand=randi([0,1],log2(obj.TxPHY.M),obj.TxPHY.NSym);
-            rng(123);
+            data_2bit=randi([0,1],log2(obj.TxPHY.M),obj.TxPHY.NSym);
+            % 相当于四个电平
+            symbols_rand = 2.^(0:log2(obj.TxPHY.M)-1)*data_2bit;
         end
 
         % 调制生成信号
@@ -179,6 +219,13 @@ classdef DDTx < handle
             end
         end
 
+
+        % 对信号进行加噪
+        function dataOut=addNoiseEbN0(~,datain,Eb_N0_dB)
+            noise=EbN0_dB(datain,Eb_N0_dB);
+            % 加入噪声
+            dataOut = real(datain+noise);
+        end
         % 相噪建模
         function   Pin=phaseNoise(obj,sigTx,lw)
             % 相噪建模
@@ -201,13 +248,61 @@ classdef DDTx < handle
             sigLO = basicLaserModel(paramLO);
         end
 
+        % 器件频域响应模型
+        function [filt,H]=createFrequencyResponse(obj,freq,order,f3dB,verbose)
+            %f3dB=20e9;
+            %order=5;
+            %verbose=0;
+            % 归一化的截止频率
+            fcnorm = f3dB/(obj.TxPHY.fs/2);
+            if strcmp(obj.Implementation.responType,'Bessel')
+                filt=Besslf_filter(order,fcnorm,verbose);
+                % 获取频响 (已经去除延时)
+                H = filt.H(freq/obj.TxPHY.fs);
+            elseif strcmp(obj.Implementation.responType,'Gaussion')
+                % 高斯滤波器
+                nlength=length(freq);
+                filt=Gaussian_filter(order,fcnorm,nlength,verbose);
+                H = filt.H(freq/obj.TxPHY.fs);
+            end
+        end
 
-        % 应用信道相应
+        % ADC 加入采样时钟偏移
+        function Eout=addSamplingClockOffset(obj,Ei,ppm,jitter_rms,fsBase_ADC)
+            if nargin<5
+                % 默认ADC的基准采样率为系统的采样率
+                fsBase_ADC=obj.TxPHY.fs;
+            end
+            Fs_in=obj.TxPHY.fs;
+            Fs_adc = fsBase_ADC*(1 + ppm/1e6);
+            ppm_meas = (Fs_adc-fsBase_ADC)/(fsBase_ADC)*1e6;
+            fprintf('ADC sampling rate = %.5f GS/s\n',Fs_adc/1e9);
+            fprintf('ADC sampling clock drift = %.2f ppm\n',ppm_meas);
+
+            if ~isreal(Ei)
+                % Signal interpolation to the ADC's sampling frequency
+                Eout = clockSamplingInterp(real(Ei), Fs_in, Fs_adc, jitter_rms) + 1i * clockSamplingInterp(imag(Ei), Fs_in, Fs_adc, jitter_rms);
+            else
+                % Signal interpolation to the ADC's sampling frequency
+                Eout = clockSamplingInterp(Ei, Fs_in, Fs_adc, jitter_rms);
+            end
+        end
+
+        % 匹配滤波
+        function outSignal=matchFiltering(obj,input)
+            % remove Dc
+            input=input-mean(input);
+            outSignal=conv(input,obj.TxPHY.hsqrt ,'same');
+            outSignal=pnorm(outSignal);
+        end
+
+
+        % 应用信道
         function sigRxo=channelApply (~,hch,sigTxo)
 
             % Channel
             % 信道响应
-            %hch = [0.74 -0.514 0.37 0.216 0.062];
+            % hch = [0.74 -0.514 0.37 0.216 0.062];
             % hch = [0.207, 0.815, 0.207];
             % hch_up = upsample(hch, SpS);
 
@@ -288,7 +383,7 @@ classdef DDTx < handle
             plot(linspace(-obj.TxPHY.fs /2,obj.TxPHY.fs /2,length(Pre_filter)),10*log10(abs(fftshift(fft(Pre_filter)))));
             title('Pre_filter');
         end
-        
+
         % CD FIR Apply
         function TxWfm_PreEDC=cdFIRApply(obj,DER,FiberLen)
             % 生成
@@ -309,11 +404,15 @@ classdef DDTx < handle
             % 注： DER参数选取
             %DER = 22;  %% 对于GS来说需要22左右   对于FIR来说在1左右
             TxWfm = TxWfm+ 10^(DER/20);
+            % 输出数值
             disp(10*log(max(abs(TxWfm))/min(abs(TxWfm))))
             Pt=TxWfm;
             % 取幅度
             s0_t=sqrt(Pt);
             st_temp = s0_t;
+            % 迭代次数
+            iteration = 40;
+            C_speed = 3e8;
             for i=1:iteration
                 st = abs(st_temp);
                 rt = FiberDispersion( st, C_speed, FiberLen, obj.TxPHY.fs  );
@@ -341,10 +440,10 @@ classdef DDTx < handle
             % 将发射功率除以偏振模式的数量可以得到每个通道在单个偏振模式下的功率。
             if strcmp(Channel_power_type,'output')
                 % 这句的作用是，输出的光功率 就是 设置的功率，不用进行放大了，也即前面设置的功率为输出的光功率
-                signal = sqrt(Pin / obj.TxPHY.Nmodes) * pnorm(input);
+                signal = sqrt(Pin) * pnorm(input);
             elseif strcmp(Channel_power_type,'input')
                 % 这里的作用是， 前面设置的即为输入光功率为多少，
-                signal = sqrt(Pin / obj.TxPHY.Nmodes)* (input) ;
+                signal = sqrt(Pin)* (input) ;
             end
         end
 
