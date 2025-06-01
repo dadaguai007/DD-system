@@ -28,6 +28,7 @@ classdef DspSyncDecoding < handle
 %             obj.Implementation.eta       = 1;              % 环路阻尼因子（稳定性控制）
 %             obj.Implementation.Bn_Ts     = 0.01;           % 环路带宽 × 符号周期（控制同步速度）
            obj.Button.freqRecover='off';
+           obj.Button.Train='on';
         end
 
 
@@ -295,13 +296,17 @@ classdef DspSyncDecoding < handle
             % 量化区间
             A=[-2 0 2];
             % 参考信号  重复 一定数量 ，满足解码 数量
-            ref_seq=repmat(obj.Implementation.ref,100,1);
+            ref_seq=repmat(obj.Implementation.ref,1,100);
             ref_seq=ref_seq(:);
             % 参考序列
-            [~,label] = quantiz(ref_seq,A,[-3,-1,1,3]);
+            if strcmp(obj.Button.Train,'on')
+                [~,label] = quantiz(ref_seq,A,[-3,-1,1,3]);
+            else
+                [~,label] = quantiz(ref_seq,pnorm(A),[-3,-1,1,3]);
+            end
             label_bit=obj.pam4demod(label);
             % 接收序列
-            [~,I] = quantiz(eq_signal,A,[-3,-1,1,3]);
+            [~,I] = quantiz(eq_signal,pnorm(A),[-3,-1,1,3]);
             decodedData=obj.pam4demod(I);
             % 解码
             [ber,num,~] = CalcBER(decodedData(obj.Nr.ncut_index:end),label_bit(obj.Nr.ncut_index:end)); %计算误码率

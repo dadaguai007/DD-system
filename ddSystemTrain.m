@@ -77,6 +77,7 @@ power=signalpower(sigTxo);
 fprintf(' optical signal power: %.2f dBm\n', 10 * log10(power / 1e-3));
 
 
+
 %% 添加信道延迟
 % timeOffset = 25;       % 信道延迟（采样点数）
 % % 延迟模块（模拟信道延迟）
@@ -145,7 +146,55 @@ sps=Tx.TxPHY.sps;
 % 搜寻时间信号的极值
 % [rxSync,P,OptSampPhase,MaxCorrIndex]=clockRecovery.time_phase_Recovery(matchOut);
 
-%%
+%% Eq
+EQ=struct();
+EQ.u=0.001;
+EQ.k1=31;
+EQ.k2=15;
+EQ.ref=16;
+EQ.sps=2;
+EQ.lamda=0.9999;
+EQ.delta=0.01;
+
+refEq=Tx.createReferenceSignal(label);
+% FFE_LMS
+[yEq,en,w] = FFE_LMS(EQ, matchOut.', refEq.');
+
+plotEquParam(matchOut,yEq,refEq,w,en)
+
+% decode
+[decodedDataEq,berEq]=clockRecovery.PAM_ExecuteDecoding(yEq);
+
+if 1
+    % 噪声白化
+    noise = yEq - refEq(1:length(yEq));
+    lambda=0.9999;
+    switch log2(M)
+        case 1 % OOK
+            Coe = zeros(1,8);
+            step = 0.005;
+        case 2 % PAM
+            Coe = zeros(1,4);
+            step = 0.005;
+    end
+    % 噪声白化滤波器
+    % 失效,有待探究
+    % [Shaping_Tap, error] = Modified_PR_PostFilter_RLS_Train( yEq, label(1:2e3), lambda, Coe )
+    % [Shaping_Tap, error] = Modified_APR_PostFilter_RLS_Train( yEq, label(1:2e3),  lambda, Coe );
+
+
+    % [Shaping_Tap, error] = PR_PostFilter_RLS_Train( yEq, label(1:2e3), lambda, Coe );
+    % [Shaping_Tap, error] = Modified_APR_PostFilter_LMS_Train( yEq, label(1:2e3), step, Coe );
+    [Shaping_Tap, error] = Modified_PR_PostFilter_LMS_Train(yEq, label(1:2e3), step, Coe );
+    % [Shaping_Tap, error] = PR_PostFilter_LMS_Train( yEq, label(1:2e3), step, Coe );
+    yEq_NoiseWhiting =filter(Shaping_Tap,1,yEq); % 对信号白化
+    noise_NoiseWhiting  =filter(Shaping_Tap,1,noise); % 对噪声白化，查看效果
+    RxDown =mlseeq(yEq_NoiseWhiting,Shaping_Tap,const,1000,'rst',1);%mlse
+
+    % decode
+    clockRecovery.PAM_ExecuteDecoding(real(RxDown));
+end
+%% 无Eq 解码
 
 % downsample
 outSignal=downsample(matchOut,sps);

@@ -15,7 +15,7 @@ x3 = cat(1,xn(obj.ref+1:end),dn(end-obj.ref+1:end));
 y_d = zeros(size(yn));
 
 
-for i = 1:n - 1
+for i = 1:n
     x = cat(1,x(obj.sps+1:end),x3(obj.sps*i-obj.sps+1:1:obj.sps*i));
     yn(i) = x.'*w ;
     % 判决
@@ -40,5 +40,5 @@ yn = yn(:);
 
 
 % 输出
-ffe = yn;
+ffe = yn.';
 end

@@ -39,7 +39,7 @@ fb = zeros(1,fblen_1);
 % 前馈抽头
 x1=zeros(tapslen_1,1);
 
-for idx = 1:n-1
+for idx = 1:n
     %构建volterra输入
     %一阶前馈输入
     x1 = cat(1,x1(sps+1:end),xn(sps*idx-sps+1:1:sps*idx));

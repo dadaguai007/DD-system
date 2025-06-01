@@ -15,7 +15,7 @@ x1 = zeros(k_fe, 1);
 x2 = zeros(k_fb, 1);
 x3 = cat(1,xn(obj.ref+1:end),dn(end-obj.ref+1:end));
 
-for i = 1:n-1
+for i = 1:n
     x1 = cat(1,x1(obj.sps+1:end),x3(obj.sps*i-obj.sps+1:1:obj.sps*i));
     yn(i) = x1.'*w1+ x2.'*w2;
     % 进入判决程序

@@ -34,7 +34,12 @@ classdef DDTx < handle
             obj.Button.delaySignal = 'symbol';          % 采用采样点延迟
         end
 
-
+        % 参考信号(解码使用)
+        function refOut=createReferenceSignal(obj,ref)
+            % 得到用于解码的参考信号
+            obj.Implementation.ref = repmat(ref,1,100);
+            refOut=obj.Implementation.ref;
+        end
 
         % 创建参考星座图
         function [const,Ksym]=creatReferenceConstellation(obj)
@@ -48,7 +53,7 @@ classdef DDTx < handle
         end
 
         % 输出信号
-        function [filteredSignal,pamSignalNorm]=dataOutput(obj)
+        function [filteredSignal,pam_signal]=dataOutput(obj)
             % 成型滤波器
             if strcmp(obj.Button.shapingFilter,'system')
                 pulse = obj.systemHsqrt();
