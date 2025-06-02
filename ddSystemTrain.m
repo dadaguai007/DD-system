@@ -22,20 +22,20 @@ label=pamsignal;
 [const,Ksym]=Tx.creatReferenceConstellation();
 
 % 数据性能起始位置
-skip = 0.1 * Tx.TxPHY.NSym; % 跳过初始瞬态（20%符号）
+skip = 0.2 * Tx.TxPHY.NSym; % 跳过初始瞬态（20%符号）
 
 
 if 0
     % THP
     THP=THPClase(1,1);
     load('THP_w.mat');
-    modN=18;
+    modN=16;
     % Pre
     [pre_equalised_with_mod,xInput]=THP.preTHP((pamsignal),tapsTHP,modN);
     %     % 归一化
     %     preSignalNorm = pnorm(pre_equalised_with_mod);
     % 脉冲成型 装载成型后的信号
-    signal=Tx.applyShapingFilter(pre_equalised_with_mod,hsqrt);
+    signal=Tx.applyShapingFilter((pre_equalised_with_mod),hsqrt);
     signal=signal.';
 end
 
@@ -206,7 +206,7 @@ if 0
 end
 % decode
 [decodedDataEq,berEq]=clockRecovery.PAM_ExecuteDecoding(yEq);
-
+% Tx.PAM_ExecuteDecoding(yEq,const);
 if 0
     tapsTHP=w(EQ.k1+1:end);
     save('THP_w', 'tapsTHP');
@@ -271,6 +271,7 @@ end
 % decode
 clockRecovery.Button.Train='off';
 [decodedData,ber]=clockRecovery.PAM_ExecuteDecoding(outSignal);
+% Tx.PAM_ExecuteDecoding(outSignal,const);
 
 % 实部的分布
 [value,percentReal] = amplitude_distribution(yEq);

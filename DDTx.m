@@ -32,6 +32,7 @@ classdef DDTx < handle
                 obj.Button.shapingFilter               = varargin{13};% 成型滤波器的生成方式
             end
             obj.Button.delaySignal = 'symbol';          % 采用采样点延迟
+            obj.Nr.ncut_index = 0.2*obj.TxPHY.NSym; %解码起始位置
         end
 
         % 参考信号(解码使用)
@@ -40,7 +41,22 @@ classdef DDTx < handle
             obj.Implementation.ref = repmat(ref,1,100);
             refOut=obj.Implementation.ref;
         end
+        function [decodedData,ber] = PAM_ExecuteDecoding(obj, eq_signal,const)
+            % 针对 PAM4 解码，计算误码
 
+            % 参考信号
+            ref_seq=obj.Implementation.ref;
+            label=decision(ref_seq,const);
+            % 参考序列
+            label_bit=obj.pam4demod(label);
+            % 接收序列
+            I=decision(eq_signal,const);
+            decodedData=obj.pam4demod(I);
+            % 解码
+            [ber,num,~] = CalcBER(decodedData(obj.Nr.ncut_index:end),label_bit(obj.Nr.ncut_index:end)); %计算误码率
+            %[ber,num,~] = CalcBER(I(obj.Nr.ncut_index:end),label(obj.Nr.ncut_index:end)); %计算误码率
+            fprintf('Num of Errors = %d, BER = %1.7f\n',num,ber);
+        end
         % 创建参考星座图
         function [const,Ksym]=creatReferenceConstellation(obj)
             % Constellation
@@ -216,6 +232,7 @@ classdef DDTx < handle
         function    filteredSignal=applyShapingFilter(obj,symbTx,pulse)
             % Upsampling
             symbolsUp = upsample(symbTx, obj.TxPHY.sps);
+            %symbolsUp = resample(symbTx, obj.TxPHY.sps,1);
             % Pulse shaping
             if strcmp(obj.Button.shapingFilter,'system')
                 filteredSignal=conv(symbolsUp,pulse,'same');
@@ -309,14 +326,14 @@ classdef DDTx < handle
             % 信道响应
             % hch = [0.74 -0.514 0.37 0.216 0.062];
             % hch = [0.207, 0.815, 0.207];
-            
+
             hch_up = upsample(hch, obj.TxPHY.sps);
 
             % 经过信道
             sigRxo=filter(hch,1,sigTxo);
-%             delay= grpdelay(hch,1,1);
-%             %去除延时点
-%             sigRxo = sigRxo(floor(delay)+1:end);
+            %             delay= grpdelay(hch,1,1);
+            %             %去除延时点
+            %             sigRxo = sigRxo(floor(delay)+1:end);
 
             % 使用conv进行测试
             % sigRxo=conv(sigRxo,hch,'same');
@@ -471,5 +488,30 @@ classdef DDTx < handle
             title('Response_Tdomain');
         end
 
+        function y= pam4demod(obj,sig)
+            % 调制格式
+            M= obj.TxPHY.M;
+            % 解码类型
+            y=zeros(1,length(sig)*2);
+            %%PAM4
+            for i = 1:length(sig)
+                if sig(i) == -3
+                    y(i*2-1) = 0;
+                    y(i*2) = 0;
+                elseif sig(i) == -1
+                    y(i*2-1) = 1;
+                    y(i*2) = 0;
+                    %原始对应的是01
+                elseif sig(i) == 1
+                    y(i*2-1) = 1;
+                    y(i*2) = 1;
+                elseif sig(i) == 3
+                    y(i*2-1) = 0;
+                    y(i*2) = 1;
+                    %原始对应的是10
+                end
+            end
+            y = y(:);
+        end
     end
 end

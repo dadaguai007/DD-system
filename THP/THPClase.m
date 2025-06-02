@@ -73,6 +73,7 @@ classdef THPClase
             taps=length(w);
             % 反馈向量
             x1=zeros(taps, 1);
+            re_xn=repmat(xn,1,2);
             % THP预均衡
             pre_equalised_with_mod = zeros(n, 1);
             xInput = zeros(n, 1);
