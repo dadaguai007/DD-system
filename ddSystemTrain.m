@@ -4,6 +4,8 @@ addpath('Plot\')
 addpath('Dsp\')
 addpath('Sync\')
 addpath('Phase_Sync\')
+addpath('THP\')
+
 %% 系统初始化
 % 信号生成
 ddGeneration;
@@ -21,6 +23,22 @@ label=pamsignal;
 
 % 数据性能起始位置
 skip = 0.1 * Tx.TxPHY.NSym; % 跳过初始瞬态（20%符号）
+
+
+if 0
+    % THP
+    THP=THPClase(1,1);
+    load('THP_w.mat');
+    modN=18;
+    % Pre
+    [pre_equalised_with_mod,xInput]=THP.preTHP((pamsignal),tapsTHP,modN);
+    %     % 归一化
+    %     preSignalNorm = pnorm(pre_equalised_with_mod);
+    % 脉冲成型 装载成型后的信号
+    signal=Tx.applyShapingFilter(pre_equalised_with_mod,hsqrt);
+    signal=signal.';
+end
+
 
 if 0
     % 预编码
@@ -46,7 +64,7 @@ if 0
 end
 %% Tx and Rx Lo
 % phase noise TX
-lw   =  100e3;
+lw   =  0e3;
 phase_Noise  =  Tx.phaseNoise(signal,lw);
 
 %% 器件频响建立
@@ -77,7 +95,6 @@ power=signalpower(sigTxo);
 fprintf(' optical signal power: %.2f dBm\n', 10 * log10(power / 1e-3));
 
 
-
 %% 添加信道延迟
 % timeOffset = 25;       % 信道延迟（采样点数）
 % % 延迟模块（模拟信道延迟）
@@ -87,11 +104,11 @@ fprintf(' optical signal power: %.2f dBm\n', 10 * log10(power / 1e-3));
 
 
 % if 1
-% Tx.Button.delaySignal='symbol';
-% delay=20;
+%     Tx.Button.delaySignal='symbol';
+%     delay=20;
 % else
-% Tx.Button.delaySignal='time';
-% delay=50e-12;
+%     Tx.Button.delaySignal='time';
+%     delay=50e-12;
 % end
 % delaySig=Tx.delaySignal(sigTxo,delay);
 
@@ -142,10 +159,32 @@ sps=Tx.TxPHY.sps;
 % %接收信号，为sig_RxE\txResamp1
 % [rxSync,Kp] =clockRecovery.TED_recoverOptimalSamplingPoints(sig_RxE,matchOut,rollOff,rcDelay,const,Ksym);
 
-
 % 搜寻时间信号的极值
 % [rxSync,P,OptSampPhase,MaxCorrIndex]=clockRecovery.time_phase_Recovery(matchOut);
-
+%% LUT 计算
+if 0
+    hch = [0.207, 0.815, 0.207];
+    sigRx=Tx.channelApply(hch,signal);
+    matchOutO=Tx.matchFiltering(sigRx);
+    % downsample
+    outSignal=downsample(matchOutO,sps);
+    % decode
+    clockRecovery.PAM_ExecuteDecoding(outSignal);
+    % 记忆深度(考虑前3符号)
+    mem_len=3;
+    % LUT 查找表建立
+    [LUT, idx_I, idx_Q] = cal_lut(signal, sigRx, const*Ksym, mem_len);
+    % 应用LUT
+    sigTxoLUT=sigTx-LUT;
+    % 过信道
+    preLUTRxo=Tx.channelApply(hch,sigTxoLUT);
+    % match
+    matchOutLUT=Tx.matchFiltering(preLUTRxo);
+    % downsample
+    outSignal=downsample(matchOutLUT,sps);
+    % decode
+    clockRecovery.PAM_ExecuteDecoding(outSignal);
+end
 %% Eq
 EQ=struct();
 EQ.u=0.001;
@@ -159,13 +198,38 @@ EQ.delta=0.01;
 refEq=Tx.createReferenceSignal(label);
 % FFE_LMS
 [yEq,en,w] = FFE_LMS(EQ, matchOut.', refEq.');
-
+% DFE_LMS
+% [yEq,en,w] = DFE_LMS(EQ,  matchOut.', refEq.');
 plotEquParam(matchOut,yEq,refEq,w,en)
-
+if 0
+    yEq = THP.modulo(yEq, modN);  % 接收端模运算恢复信号
+end
 % decode
 [decodedDataEq,berEq]=clockRecovery.PAM_ExecuteDecoding(yEq);
 
-if 1
+if 0
+    tapsTHP=w(EQ.k1+1:end);
+    save('THP_w', 'tapsTHP');
+end
+
+if 0
+    % pnc and pec
+    alpha_pec = 0.42;
+    alpha_pnc = -0.5;
+    alpha_snd = 0.3;
+    alpha_snd2 = -0.15;
+    alpha_snd3 = 0;
+    pec_out = my_pec(yEq, alpha_pec, const);
+    pec_out_2 = my_pec_advanced(yEq.', [alpha_snd, alpha_snd2], const);
+    pec_out_3 = my_pec_advanced(yEq.', [alpha_snd, alpha_snd2, alpha_snd3], const);
+
+    pnc_out = my_pnc(yEq, alpha_pnc, const, 2);
+    pnc_out_2 = my_pnc_enhanced(yEq, alpha_pnc, const);
+    % decode
+    clockRecovery.PAM_ExecuteDecoding(pnc_out_2);
+end
+
+if 0
     % 噪声白化
     noise = yEq - refEq(1:length(yEq));
     lambda=0.9999;
@@ -198,8 +262,18 @@ end
 
 % downsample
 outSignal=downsample(matchOut,sps);
+
+if 0
+    % THP
+    outSignal = THP.modulo(outSignal, modN);  % 接收端模运算恢复信号
+end
+
 % decode
+clockRecovery.Button.Train='off';
 [decodedData,ber]=clockRecovery.PAM_ExecuteDecoding(outSignal);
+
+% 实部的分布
+[value,percentReal] = amplitude_distribution(yEq);
 
 
 % FiberLen=param.Ltotal*1e3;

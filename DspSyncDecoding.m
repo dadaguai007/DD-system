@@ -24,11 +24,11 @@ classdef DspSyncDecoding < handle
             end
             obj.Implementation.sync_type = 'gardner';      % 时钟误差计算方式
             obj.Implementation.loop_gain = 0.03;           % PLL的环路增益, 控制环路收敛速度和稳定性的增益系数
-%             obj.Implementation.TED       ="MLTED" ;        % 时钟误差计算方式，另一种实现方式
-%             obj.Implementation.eta       = 1;              % 环路阻尼因子（稳定性控制）
-%             obj.Implementation.Bn_Ts     = 0.01;           % 环路带宽 × 符号周期（控制同步速度）
-           obj.Button.freqRecover='off';
-           obj.Button.Train='on';
+            %             obj.Implementation.TED       ="MLTED" ;        % 时钟误差计算方式，另一种实现方式
+            %             obj.Implementation.eta       = 1;              % 环路阻尼因子（稳定性控制）
+            %             obj.Implementation.Bn_Ts     = 0.01;           % 环路带宽 × 符号周期（控制同步速度）
+            obj.Button.freqRecover='off';
+            obj.Button.Train='on';
         end
 
 
@@ -71,7 +71,7 @@ classdef DspSyncDecoding < handle
             % 参考信号
             label=obj.Implementation.ref;
             if strcmp(obj.Button.freqRecover,'on')
-                % 对输入信号执行时间（频率）恢复 
+                % 对输入信号执行时间（频率）恢复
                 clk_output=obj.ClockRecovery(input_signal);
             else
                 % 不进行任何操作
@@ -299,20 +299,34 @@ classdef DspSyncDecoding < handle
             ref_seq=repmat(obj.Implementation.ref,1,100);
             ref_seq=ref_seq(:);
             % 参考序列
-            if strcmp(obj.Button.Train,'on')
-                [~,label] = quantiz(ref_seq,A,[-3,-1,1,3]);
-            else
-                [~,label] = quantiz(ref_seq,pnorm(A),[-3,-1,1,3]);
-            end
+            [~,label] = quantiz(ref_seq,A,[-3,-1,1,3]);
             label_bit=obj.pam4demod(label);
             % 接收序列
-            [~,I] = quantiz(eq_signal,pnorm(A),[-3,-1,1,3]);
+            if strcmp(obj.Button.Train,'on')
+                [~,I] = quantiz(eq_signal,A,[-3,-1,1,3]);
+            else
+                [~,I] = quantiz(eq_signal,pnorm(A),[-3,-1,1,3]);
+            end
             decodedData=obj.pam4demod(I);
             % 解码
             [ber,num,~] = CalcBER(decodedData(obj.Nr.ncut_index:end),label_bit(obj.Nr.ncut_index:end)); %计算误码率
             fprintf('Num of Errors = %d, BER = %1.7f\n',num,ber);
         end
-
+        
+        function mod = modulo(~,sequence, N)
+            % 模运算函数：将信号限制在[-N/2, N/2)范围内
+            for i = 1:length(sequence)
+                % 上界处理（大于N/2时循环减N）
+                while sequence(i) > N/2
+                    sequence(i) = sequence(i) - N;
+                end
+                % 下界处理（小于-N/2时循环加N）
+                while sequence(i) < -N/2
+                    sequence(i) = sequence(i) + N;
+                end
+            end
+            mod = sequence;
+        end
         function y= pam4demod(obj,sig)
             % 调制格式
             M= obj.signalPHY.M;

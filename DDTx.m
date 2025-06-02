@@ -303,19 +303,20 @@ classdef DDTx < handle
 
 
         % 应用信道
-        function sigRxo=channelApply (~,hch,sigTxo)
+        function sigRxo=channelApply (obj,hch,sigTxo)
 
             % Channel
             % 信道响应
             % hch = [0.74 -0.514 0.37 0.216 0.062];
             % hch = [0.207, 0.815, 0.207];
-            % hch_up = upsample(hch, SpS);
+            
+            hch_up = upsample(hch, obj.TxPHY.sps);
 
             % 经过信道
             sigRxo=filter(hch,1,sigTxo);
-            delay= grpdelay(hch,1,1);
-            %去除延时点
-            sigRxo = sigRxo(floor(delay)+1:end);
+%             delay= grpdelay(hch,1,1);
+%             %去除延时点
+%             sigRxo = sigRxo(floor(delay)+1:end);
 
             % 使用conv进行测试
             % sigRxo=conv(sigRxo,hch,'same');

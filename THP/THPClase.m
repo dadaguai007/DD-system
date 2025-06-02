@@ -8,7 +8,7 @@ classdef THPClase
     methods
         % 此函数只给出频域用Z变换表示的例子
         % 实践中，应该测量信道响应，在发射端做预均衡
-        
+
         % H_inv_f = 1 ./ H_f; % 信道逆频响
         % H_inv_f(abs(H_f) < eps) = 0; % 避免除以零
         % X_pre_f = X_f .* H_inv_f; % 预均衡信号频域
@@ -62,5 +62,30 @@ classdef THPClase
             end
         end
 
+        % 时域抽头反馈THP
+        function [pre_equalised_with_mod,xInput]=preTHP(obj,xn,w,N,sps)
+            % THP
+            if nargin < 5
+                sps=1;
+            end
+            n = length(xn);
+            % 抽头数
+            taps=length(w);
+            % 反馈向量
+            x1=zeros(taps, 1);
+            % THP预均衡
+            pre_equalised_with_mod = zeros(n, 1);
+            xInput = zeros(n, 1);
+            for i=1:n
+                yn=x1.'*w;
+                % 反馈
+                xInput(i)=xn(i)+yn;
+                % 模运算控制信号幅度
+                pre_equalised_with_mod (i)= obj.modulo(xInput(i), N); % 将信号限制在[-N/2, N/2)
+                % 取taps数的
+                x1 = cat(1,x1(sps+1:end),xn(sps*(i-1)+1:1:sps*i));
+            end
+
+        end
     end
 end
