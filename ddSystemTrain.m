@@ -54,6 +54,11 @@ if 0
     taps3=1;
     [filteredPRS_Nonlinear,prs_sig_Nonlinear,w]=Tx.prsSignalNonlinear(D,taps1,taps2,taps3);
 
+    % 针对PRS的接收端(PR的解码)
+    %out_edc = mlseeq(ffe_out, filteredPRS, constellation, 1000, 'rst');
+
+
+
     % 色散预补偿 生成FIR
     FiberLen=param.Ltotal*1e3;
     DER1=1;
@@ -212,6 +217,16 @@ if 0
     save('THP_w', 'tapsTHP');
 end
 
+
+if 0
+    k_sps=1.8; % 可选 2/1.8/1.6/1.4/1.2
+    itera=4;
+    % sub-sampling FIR
+    ffe_out = ffe_k_sps_lms(resample(matchOut, fb*1.8, fb*2), 20, 5e-2, refEq, k_sps, itera);
+    dfe_out = ffe_dfe_k_sps_lms(resample(matchOut, fb*1.8, fb*2), [20, 1], [5e-2, 1e-3], refEq, k_sps, itera);
+end
+
+
 if 0
     % pnc and pec
     alpha_pec = 0.42;
@@ -228,6 +243,14 @@ if 0
     % decode
     clockRecovery.PAM_ExecuteDecoding(pnc_out_2);
 end
+
+
+if 0
+    alpha_pf=0.4;
+    % pf and mlse
+    pf_out = mlseeq(filter([1, alpha_pf], 1, yEq), [1, alpha_pf], const, 1000, 'rst');
+end
+
 
 if 0
     % 噪声白化
