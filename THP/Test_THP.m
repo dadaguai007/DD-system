@@ -1,5 +1,5 @@
 clc;clear;close all;
-addpath('D:\BIT_PhD\DD-system\THP\Fncs\');
+addpath('D:\BIT_PhD\DD-system\Fncs\');
 % 系统参数设置
 N = 3;                    % 模运算的模数
 x = ones(8,1)*0.75;         % 生成8点原始信号序列，每个元素为0.75
@@ -19,7 +19,7 @@ Ta  = 1/Fs;
 
 %PAM
 M=4;
-data_2bit=randi([0,1],log2(M),80);
+data_2bit=randi([0,1],log2(M),800);
 % 相当于四个电平
 symbols = 2.^(0:log2(M)-1)*data_2bit;
 % Mapeia bits para pulsos
@@ -50,11 +50,12 @@ n = [0:length(sigTx)-1]; % 时间轴
 % 图1：原始信号与无预编码接收信号对比
 figure
 stem(n, [sigTx.', output_without_precoder]);
-title('发射与接收序列对比（无预编码）');
-xlabel('时间索引 n');
-legend({'发射序列','接收序列'}, 'Location','northwest');
+title('Transmitted Sequence and without Prcode');
+xlabel('n');
+legend({'original sequence','received sequence'}, 'Location','northwest');
 
-
+sz_window=8;
+[~,ccdfy1]=ccdf(output_without_precoder,sz_window,0);
 %% ========== THP预编码处理 ==========
 % 信道逆预均衡
 channel_inverse = 1/channel; % 计算信道逆：H⁻¹(z) = 1/(1 - z⁻¹)
@@ -63,18 +64,19 @@ z_pre_equalised = z_x * channel_inverse; % 预均衡：X'(z) = X(z)·H⁻¹(z)
 % 预均衡后的信号
 pre_equalised=THP.zTrans(z_pre_equalised,sigTx);% 逆Z变换得到时域表达式
 
+[~,ccdfy2]=ccdf(pre_equalised,sz_window,0);
 % 模运算控制信号幅度
 pre_equalised_with_mod = THP.modulo(pre_equalised, N); % 将信号限制在[-N/2, N/2)
-
+[~,ccdfy3]=ccdf(pre_equalised_with_mod,sz_window,1);
 % 将预编码信号重新转换为Z域
 zz_pre_equalised=THP.Transz(pre_equalised_with_mod);
 
 % 预编码信号通过实际信道
 z_output = zz_pre_equalised * channel; % Y(z) = X'(z)·H(z)
 output=THP.zTrans(z_output,sigTx); % 接收端时域信号
-
+[~,ccdfy4]=ccdf(output,sz_window,0);
 output_with_mod = THP.modulo(output, N);  % 接收端模运算恢复信号
-
+[ccdfx,ccdfy5]=ccdf(output_with_mod,sz_window,0);
 
 
 

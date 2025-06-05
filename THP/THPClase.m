@@ -70,6 +70,8 @@ classdef THPClase
             end
             n = length(xn);
             % 抽头数
+            % 需要增加0阶系数
+            w=[1,w];
             taps=length(w);
             % 反馈向量
             x1=zeros(taps, 1);
