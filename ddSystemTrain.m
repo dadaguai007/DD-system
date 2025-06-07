@@ -58,7 +58,6 @@ if 0
     %out_edc = mlseeq(ffe_out, filteredPRS, constellation, 1000, 'rst');
 
 
-
     % 色散预补偿 生成FIR
     FiberLen=param.Ltotal*1e3;
     DER1=1;
@@ -69,7 +68,7 @@ if 0
 end
 %% Tx and Rx Lo
 % phase noise TX
-lw   =  0e3;
+lw   =  10e3;
 phase_Noise  =  Tx.phaseNoise(signal,lw);
 
 %% 器件频响建立
@@ -86,6 +85,11 @@ phase_Noise  =  Tx.phaseNoise(signal,lw);
 %% 发射机创建
 amp_factor=0.28; % EA放大
 sigTx=signal*amp_factor;
+
+if 0
+    % 眼图测试函数，还未完成，基本功能已实现
+    eyediagram_dense(sigTx(1:1e5),5*sps,'time',time(1:1e5),'histogram', true,'xresolution', 800);
+end
 
 % mod index
 m=Modulation_index(sigTx,Vpi,'pam');
