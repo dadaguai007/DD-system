@@ -129,11 +129,14 @@ function [BER]=monteCarlo(channel, equalizer, snr_db, is_FDE, G, E, name, cyclic
 %             channel_result = conv(trSymVec, channel,'full');
             channel_result = filter(channel, 1, trSymVec);
 
-%             channel_result = channel_result(1:end-channel_length+1);
+            
+            channel_result1 = conv(trSymVec, channel);
+            channel_result1 = channel_result1(1:end-channel_length+1);
 %             channel_result = channel_result(channel_length:end);
             trSymVec = channel_result;
             noise=1/sqrt(2)*[randn(1, length(trSymVec)) + 1j*randn(1,length(trSymVec))];
             recSigVec=trSymVec+sigma_noise*noise;
+            
             %%%%%%%%%%%%% EQUALIZER %%%%%%%%%%%%%
             if switch_tictoc % only once
                 disp("*************New Simulation : "+ titlee + " ********")
