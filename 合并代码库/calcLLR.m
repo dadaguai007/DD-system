@@ -13,7 +13,7 @@ function LLRs = calcLLR(rxSymb, sigma2, constSymb, bitMap, px)
         for indBit = 1:b
             p0 = sum(prob(bitMap(:, indBit) == 0));
             p1 = sum(prob(bitMap(:, indBit) == 1));
-            % 索引问题,应该从第0索引开始出发
+            % 索引，一个符号对应log2(M),出去后进行转置。
             LLRs((i-1)* b + indBit) = log(p0) - log(p1);
         end
     end

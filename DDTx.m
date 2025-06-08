@@ -200,7 +200,21 @@ classdef DDTx < handle
             %参数：obj.prbsOrder，NSym，M
             data_2bit=randi([0,1],log2(obj.TxPHY.M),obj.TxPHY.NSym);
             % 相当于四个电平
-            symbols_rand = 2.^(0:log2(obj.TxPHY.M)-1)*data_2bit;
+            % bin 编码
+            symbols_rand = 2.^(log2(obj.TxPHY.M)-1:-1:0)*data_2bit;
+            % gray编码
+            % 格雷编码映射表
+            gray_map = [
+                0 0;  % 二进制00 → 格雷码00 0
+                0 1;  % 二进制01 → 格雷码01 1
+                1 1;  % 二进制10 → 格雷码11 2
+                1 0   % 二进制11 → 格雷码10 3
+                ];
+            % 应用格雷编码 ,2,3调换
+            index_2=double(find(symbols_rand==3));
+            index_3=double(find(symbols_rand==2));
+            symbols_rand(index_2)= 2;
+            symbols_rand(index_3)= 3;
         end
 
         % 调制生成信号
@@ -488,30 +502,30 @@ classdef DDTx < handle
             title('Response_Tdomain');
         end
 
-        function y= pam4demod(obj,sig)
-            % 调制格式
-            M= obj.TxPHY.M;
-            % 解码类型
-            y=zeros(1,length(sig)*2);
-            %%PAM4
-            for i = 1:length(sig)
-                if sig(i) == -3
-                    y(i*2-1) = 0;
-                    y(i*2) = 0;
-                elseif sig(i) == -1
-                    y(i*2-1) = 1;
-                    y(i*2) = 0;
-                    %原始对应的是01
-                elseif sig(i) == 1
-                    y(i*2-1) = 1;
-                    y(i*2) = 1;
-                elseif sig(i) == 3
-                    y(i*2-1) = 0;
-                    y(i*2) = 1;
-                    %原始对应的是10
+ 
+        function [pam4demod] = pam4demod(~,sig)
+            pam4demod=zeros(1,length(sig)*2);
+            k = 1;
+            for i=1:length(sig)
+                % 'gray'编码
+                switch sig(i)
+                    case -3
+                        pam4demod(k) =0;
+                        pam4demod(k+1)=0;
+                    case -1
+                        pam4demod(k) = 0;
+                        pam4demod(k+1) = 1;
+                    case 1
+                        pam4demod(k)=1;
+                        pam4demod(k+1)=1;
+                    case 3
+                        pam4demod(k) = 1;
+                        pam4demod(k+1) = 0;
                 end
+                k=k+2;
             end
-            y = y(:);
-        end
+
+     end
+
     end
 end

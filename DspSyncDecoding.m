@@ -312,7 +312,7 @@ classdef DspSyncDecoding < handle
             [ber,num,~] = CalcBER(decodedData(obj.Nr.ncut_index:end),label_bit(obj.Nr.ncut_index:end)); %计算误码率
             fprintf('Num of Errors = %d, BER = %1.7f\n',num,ber);
         end
-        
+
         function mod = modulo(~,sequence, N)
             % 模运算函数：将信号限制在[-N/2, N/2)范围内
             for i = 1:length(sequence)
@@ -327,30 +327,28 @@ classdef DspSyncDecoding < handle
             end
             mod = sequence;
         end
-        function y= pam4demod(obj,sig)
-            % 调制格式
-            M= obj.signalPHY.M;
-            % 解码类型
-            y=zeros(1,length(sig)*2);
-            %%PAM4
-            for i = 1:length(sig)
-                if sig(i) == -3
-                    y(i*2-1) = 0;
-                    y(i*2) = 0;
-                elseif sig(i) == -1
-                    y(i*2-1) = 1;
-                    y(i*2) = 0;
-                    %原始对应的是01
-                elseif sig(i) == 1
-                    y(i*2-1) = 1;
-                    y(i*2) = 1;
-                elseif sig(i) == 3
-                    y(i*2-1) = 0;
-                    y(i*2) = 1;
-                    %原始对应的是10
+
+        function [pam4demod] = pam4demod(~,sig)
+            pam4demod=zeros(1,length(sig)*2);
+            k = 1;
+            for i=1:length(sig)
+                % 'gray'编码
+                switch sig(i)
+                    case -3
+                        pam4demod(k) =0;
+                        pam4demod(k+1)=0;
+                    case -1
+                        pam4demod(k) = 0;
+                        pam4demod(k+1) = 1;
+                    case 1
+                        pam4demod(k)=1;
+                        pam4demod(k+1)=1;
+                    case 3
+                        pam4demod(k) = 1;
+                        pam4demod(k+1) = 0;
                 end
+                k=k+2;
             end
-            y = y(:);
         end
 
 
