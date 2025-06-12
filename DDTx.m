@@ -1,6 +1,4 @@
 classdef DDTx < handle
-    % To Do:
-    % 添加延迟函数
 
     % 定义类的属性
     properties
@@ -41,22 +39,7 @@ classdef DDTx < handle
             obj.Implementation.ref = repmat(ref,1,100);
             refOut=obj.Implementation.ref;
         end
-        function [decodedData,ber] = PAM_ExecuteDecoding(obj, eq_signal,const)
-            % 针对 PAM4 解码，计算误码
 
-            % 参考信号
-            ref_seq=obj.Implementation.ref;
-            label=decision(ref_seq,const);
-            % 参考序列
-            label_bit=obj.pam4demod(label);
-            % 接收序列
-            I=decision(eq_signal,const);
-            decodedData=obj.pam4demod(I);
-            % 解码
-            [ber,num,~] = CalcBER(decodedData(obj.Nr.ncut_index:end),label_bit(obj.Nr.ncut_index:end)); %计算误码率
-            %[ber,num,~] = CalcBER(I(obj.Nr.ncut_index:end),label(obj.Nr.ncut_index:end)); %计算误码率
-            fprintf('Num of Errors = %d, BER = %1.7f\n',num,ber);
-        end
         % 创建参考星座图
         function [const,Ksym]=creatReferenceConstellation(obj)
             % Constellation
@@ -68,8 +51,42 @@ classdef DDTx < handle
             obj.Implementation.constellation  = Ksym * const; % 调整后的参考星座
         end
 
+        function [decodedData,ber] = PAM_ExecuteDecoding(obj, eq_signal,const)
+            % 针对 PAM4 解码，计算误码
+            % 参考信号
+            ref_seq=obj.Implementation.ref;
+            label=decision(ref_seq,const);
+            % 参考序列
+            label_bit=obj.pam4demod(label);
+            % 接收序列
+            I=decision(eq_signal,const);
+            decodedData=obj.pam4demod(I);
+            % 解码
+            [ber,num,~] = CalcBER(decodedData(obj.Nr.ncut_index:end),label_bit(obj.Nr.ncut_index:end)); %计算误码率
+            fprintf('Num of Errors = %d, BER = %1.7f\n',num,ber);
+        end
+
+        function  [decodedData,ber] = PAM_QuantifyDecoding(obj, eq_signal)
+            % 量化区间
+            A=[-2 0 2];
+            ref_seq=obj.Implementation.ref;
+            % 参考序列
+            [~,label] = quantiz(ref_seq,A,[-3,-1,1,3]);
+            label_bit=obj.pam4demod(label);
+            % 接收序列
+            if strcmp(obj.Button.Train,'on')
+                [~,I] = quantiz(eq_signal,A,[-3,-1,1,3]);
+            else
+                [~,I] = quantiz(eq_signal,pnorm(A),[-3,-1,1,3]);
+            end
+            decodedData=obj.pam4demod(I);
+            % 解码
+            [ber,num,~] = CalcBER(decodedData(obj.Nr.ncut_index:end),label_bit(obj.Nr.ncut_index:end)); %计算误码率
+            fprintf('Num of Errors = %d, BER = %1.7f\n',num,ber);
+        end
+
         % 输出信号
-        function [filteredSignal,pam_signal]=dataOutput(obj)
+        function [filteredSignal,pam_signal,pulse]=dataOutput(obj)
             % 成型滤波器
             if strcmp(obj.Button.shapingFilter,'system')
                 pulse = obj.systemHsqrt();
@@ -86,12 +103,36 @@ classdef DDTx < handle
             end
             %调制 , 装载信号
             pam_signal=obj.pam(symbols);
+            pam_signal=real(pam_signal);
             % 归一化
             pamSignalNorm = pnorm(pam_signal);
             % 脉冲成型 装载成型后的信号
             filteredSignal=obj.applyShapingFilter(pamSignalNorm,pulse);
         end
 
+
+        function duobSignal=Duobdataout(obj)
+            %生成bit数
+            symbols=obj.modcode();
+
+            if obj.TxPHY.M > 2
+                % 应用格雷编码 ,2,3调换
+                index_2=double(find(symbols==3));
+                index_3=double(find(symbols==2));
+                symbols(index_2)= 2;
+                symbols(index_3)= 3;
+            end
+            % 生成pam
+            pamsignal = pammod(symbols,obj.TxPHY.M,0,'gray');
+            pamsignal = pnorm(pamsignal);
+            symbolsUp = upsample(pamsignal, obj.TxPHY.sps);
+            % 生成Duob 成型器
+            reverse='False';
+            pulseDoub = Duob(obj.TxPHY.sps, obj.Nr.psfLength , reverse, obj.Nr.psfRollOff );
+            % 生成Duob数据
+            duobSignal=conv(pulseDoub,symbolsUp,'same');
+
+        end
 
         % 延迟函数：
         function outSignal=delaySignal(obj,input,delay)
@@ -111,10 +152,12 @@ classdef DDTx < handle
         function [filteredPRS,prs_sig,lcoeff]=prsSignal(obj,D,taps)
             % 生成脉冲成型信号
             [~,pam_signal]=obj.dataOutput();
+            %pam_signal=pnorm(pam_signal);
             % Linear encoding   1sps 选项
-            lcoeff = prsFilter(D, taps-1, 1);
+            lcoeff = prsFilter(D, taps, 1);
             % 归一化
             lcoeff = lcoeff / sum(lcoeff);
+
             % Flitering
             prs_sig = filter(lcoeff, 1, pam_signal);
 
@@ -134,7 +177,7 @@ classdef DDTx < handle
             [~,pam_signal]=obj.dataOutput();
 
             % Linear encoding
-            lcoeff = prsFilter(D, taps1-1, 1);
+            lcoeff = prsFilter(D, taps1, 1);
             % 归一化
             lcoeff = lcoeff / sum(lcoeff);
             % Nonlinear encoding
@@ -185,15 +228,104 @@ classdef DDTx < handle
         end
 
 
+
+        function [xout,coeff]=getPrsPulse(obj,taps,reverse)
+            % PRS FTN格式
+            %   SpS      : 每个符号的样本数（默认值=2）
+            %   Nsamples : 输出脉冲的符号长度（默认值=16）
+            %   reverse  : 是否翻转脉冲 ['true'/'false']（默认='false'）
+            %   alpha    : 根升余弦滤波器的滚降因子（默认=0.01）
+            % 输出：
+            %   xout     : 双二进制脉冲成形滤波器系数
+            %if nargin<2
+            %    SpS=2;
+            %end
+            %if nargin<3
+            %    Nsamples=16;
+            %end
+            %if nargin<4
+            %    reverse='false';
+            %end
+            %if nargin<5
+            %    alpha=0.01;
+            %end
+            if nargin<2
+                taps=2;
+            end
+            if nargin<4
+                reverse='false';
+            end
+            % 参数设置
+            alpha=obj.Nr.psfRollOff;
+            Nsamples=obj.Nr.psfLength;
+            SpS=obj.TxPHY.sps;
+            syms x;  % 定义符号变量x
+            y = (1 + x)^taps;  % 构造二项式表达式 (1+x)^N
+            coeff = double(flip(coeffs(expand(y))));  % 多项式展开 -> 提取系数 -> 反转顺序 -> 转为数值
+
+            K = length(coeff) - 1;                % 多项式阶数
+            max_delay = K;                         % 最大延迟符号数
+            % 扩展长度（避免边界效应）
+            N_extend = 2 * max_delay*SpS;   % 扩展的符号长度
+
+            % 扩展滤波器长度（避免边界效应）
+            N = Nsamples + N_extend;  % 实际生成长度 = 输出长度 + 两端各扩展SpS个样本
+
+            % 参数说明：
+            %   alpha : 滚降因子（控制带宽）
+            %   N     : 滤波器长度（符号数）
+            %   SpS   : 每个符号样本数
+            %   'sqrt': 生成根升余弦而非普通升余弦
+            p = rcosdesign(alpha,N,SpS,'sqrt');
+
+            % 时域实现：原始脉冲 + 延迟SpS样本的脉冲
+            % 向左滚动SpS 个符号
+
+            % 初始化输出脉冲
+            x = zeros(1, length(p));
+            % ===== 核心：多项式加权叠加 =====
+            for k = 0:K
+                delay_samples = k * SpS;           % 延迟样本数
+                weighted_pulse = coeff(k+1) * circshift(p, -delay_samples);
+                x = x + weighted_pulse;            % 累加加权延迟脉冲
+            end
+
+            %翻转
+            % 当 reverse='true' 时生成匹配滤波器
+            % 脉冲翻转
+            if strcmp(reverse, 'true')
+                x = flip(x);
+            end
+
+            % 截取有效部分 (保留中间Nsamples长度，去除扩展的边界样本)
+            start_idx = max_delay * SpS + 1;
+            end_idx = length(x) - max_delay * SpS;
+            xout = x(start_idx : end_idx);
+
+        end
+
+        % PRS Code
+        function [prsSignal,coeff]=prsCodeSignal(obj,taps,reverse)
+            % 生成脉冲成型信号
+            [~,pam_signal]=obj.dataOutput();
+            pam_signal=pnorm(pam_signal);
+            [pulse,coeff]=obj.getPrsPulse(taps,reverse);
+            symbolsUp = upsample(pam_signal, obj.TxPHY.sps);
+            prsSignal=conv(symbolsUp,pulse,'same');
+        end
+
         % 生成比特数
         function [data,symbols_prbs]=prbs_bits(obj)
             %参数：obj.prbsOrder，NSym，M
             %采用prbs码生成基本数据
             data = prbs1(obj.TxPHY.prbsOrder,obj.TxPHY.NSym*log2(obj.TxPHY.M),0);
             data_2bit=reshape(data,log2(obj.TxPHY.M),[]);
-            %             symbols_prbs = 2.^(0:log2(obj.M)-1)*data_2bit;
+            %symbols_prbs = 2.^(0:log2(obj.M)-1)*data_2bit;
             symbols_prbs=double(data_2bit);
         end
+
+
+
         % 生成比特数
         function symbols_rand=rand_bits(obj)
             rng(obj.TxPHY.order);
@@ -215,6 +347,32 @@ classdef DDTx < handle
             index_3=double(find(symbols_rand==2));
             symbols_rand(index_2)= 2;
             symbols_rand(index_3)= 3;
+        end
+
+        % 异或编码
+        function symbols=modcode(obj)
+            %生成bit数
+            switch lower(obj.Button.DataType)
+                case 'prbs'
+                    bits = prbs1(obj.TxPHY.prbsOrder,obj.TxPHY.NSym*log2(obj.TxPHY.M),0);
+                case 'rand'
+                    rng(obj.TxPHY.order);
+                    %参数：obj.prbsOrder，NSym，M
+                    bits=randi([0,1],log2(obj.TxPHY.M),obj.TxPHY.NSym);
+            end
+
+            c_bits=zeros(1,length(bits(:)));
+            for i = 1:length(bits)
+                if i==1
+                    c_bits(i)=bits(i);
+                else
+                    %异或运算
+                    c_bits(i) =xor(bits(i),c_bits(i-1));
+                end
+            end
+            c_bits=reshape(c_bits,log2(obj.TxPHY.M),[]);
+            % 二进制转换
+            symbols = 2.^(log2(obj.TxPHY.M)-1:-1:0)*c_bits;
         end
 
         % 调制生成信号
@@ -502,7 +660,7 @@ classdef DDTx < handle
             title('Response_Tdomain');
         end
 
- 
+
         function [pam4demod] = pam4demod(~,sig)
             pam4demod=zeros(1,length(sig)*2);
             k = 1;
@@ -525,7 +683,7 @@ classdef DDTx < handle
                 k=k+2;
             end
 
-     end
+        end
 
     end
 end

@@ -39,6 +39,6 @@ filtercoeff = filtercoeff .* coeff;  % 逐元素相乘，得到最终滤波器�
 % filtercoeff = filtercoeff / sum(filtercoeff);  % 注释掉的归一化操作（按需启用）
 
 % ========== 6. 计算截止频率 ==========
-wc = getcutoff(filtercoeff, 3);  
+wc = getCutoff(filtercoeff, 3);  
 
 end

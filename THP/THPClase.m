@@ -50,6 +50,22 @@ classdef THPClase
             mod = sequence;
         end
 
+        function [mod,mod_an]=modsquence(~,sequence,N)
+            % mod squence An
+            mod_an=zeros(1,length(sequence));
+            for i = 1:length(sequence)
+                while sequence(i) > N/2
+                    mod_an(i)=-N*(sequence(i)/N+1/2);
+                    sequence(i)=sequence(i)-N*(sequence(i)/N+1/2);
+                end
+                while sequence(i) < -N/2
+                    mod_an(i)=-N*(sequence(i)/N+1/2);
+                    sequence(i)=sequence(i)-N*(sequence(i)/N+1/2);
+                end
+            end
+            mod=sequence;
+        end
+
         function s = delta2sequence(~,expression, len)
             % 将逆Z变换结果转换为离散序列
             % 输入：expression-符号表达式，len-序列长度
@@ -71,7 +87,7 @@ classdef THPClase
             n = length(xn);
             % 抽头数
             % 需要增加0阶系数
-            w=[1,w];
+            %w=[1;w]; % 错误写法
             taps=length(w);
             % 反馈向量
             x1=zeros(taps, 1);
@@ -80,13 +96,15 @@ classdef THPClase
             pre_equalised_with_mod = zeros(n, 1);
             xInput = zeros(n, 1);
             for i=1:n
-                yn=x1.'*w;
                 % 反馈
-                xInput(i)=xn(i)+yn;
+                yn=x1.'*w;
+                % 输入模运算
+                xInput(i)=xn(i)-yn;
                 % 模运算控制信号幅度
-                pre_equalised_with_mod (i)= obj.modulo(xInput(i), N); % 将信号限制在[-N/2, N/2)
-                % 取taps数的
-                x1 = cat(1,x1(sps+1:end),xn(sps*(i-1)+1:1:sps*i));
+                % pre_equalised_with_mod (i)= obj.modulo(xInput(i), N); % 将信号限制在[-N/2, N/2)
+                pre_equalised_with_mod (i)= obj.modsquence(xInput(i), N);
+                % 取taps数
+                x1 = cat(1,x1(sps+1:end),pre_equalised_with_mod(sps*(i-1)+1:1:sps*i));
             end
 
         end

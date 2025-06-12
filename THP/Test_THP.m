@@ -1,12 +1,12 @@
 clc;clear;close all;
-% addpath('D:\BIT_PhD\DD-system\Fncs\');
-addpath('D:\PhD\DD-system\Fncs\');
-addpath('D:\PhD\DD-system\Plot\')
+addpath('D:\BIT_PhD\DD-system\Fncs\');
+% addpath('D:\PhD\DD-system\Fncs\');
+% addpath('D:\PhD\DD-system\Plot\')
 % 系统参数设置
 N = 6;                    % 模运算的模数
 x = ones(8,1)*0.75;         % 生成8点原始信号序列，每个元素为0.75
 syms z;                     % 声明符号变量z（用于Z域分析）
-channel = 1 - z^(-1);       % 定义信道传递函数：H(z) = 1 - z⁻¹（典型ISI信道模型）
+channel = 1 + z^(-1);       % 定义信道传递函数：H(z) = 1 - z⁻¹（典型ISI信道模型）
 % channel=1-z^{-1}+3*z^{-2}+0.1*z^{-10};
 % 创建类
 THP=THPClase(1, 1);
@@ -21,7 +21,7 @@ Ta  = 1/Fs;
 
 %PAM
 M=4;
-data_2bit=randi([0,1],log2(M),800);
+data_2bit=randi([0,1],log2(M),80);
 % 相当于四个电平
 symbols = 2.^(0:log2(M)-1)*data_2bit;
 % Mapeia bits para pulsos
@@ -101,7 +101,7 @@ output_without_precoder=THP.zTrans(z_output,sigTx);% 逆Z变换得到时域表�
 
 n = [0:length(sigTx)-1]; % 时间轴
 
-index=1:200;
+index=1:160;
 % 图1：原始信号与无预编码接收信号对比
 figure
 stem(n(index), [sigTx(index).', output_without_precoder(index)],LineWidth=1.25);
